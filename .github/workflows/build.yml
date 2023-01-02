@@ -1,0 +1,114 @@
+name: build
+
+env:
+  VMTOOLS_PREFIX: /opt/VirtualMetal/vmtools
+  VMTOOLS_BINUTILS: binutils-2.39
+  VMTOOLS_GCC: gcc-12.2.0
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+        target: [x86_64-elf, aarch64-elf]
+        include:
+          - os: windows-latest
+            shell: msys2 {0}
+          - os: ubuntu-latest
+            shell: bash
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+    env:
+      VMTOOLS_TARGET: ${{ matrix.target }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - name: Install prerequisites (Windows)
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: mingw64
+          install: >-
+            base-devel
+            mingw-w64-x86_64-gcc
+      - name: Install prerequisites (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt install libgmp3-dev
+          sudo apt install libmpc-dev
+          sudo apt install libmpfr-dev
+          sudo apt install libisl-dev
+      - name: Download binutils source
+        run: |
+          wget -q https://ftp.gnu.org/gnu/binutils/$VMTOOLS_BINUTILS.tar.xz
+          tar xf $VMTOOLS_BINUTILS.tar.xz
+      - name: Download gcc source
+        run: |
+          wget -q https://ftp.gnu.org/gnu/gcc/gcc-12.2.0/$VMTOOLS_GCC.tar.xz
+          tar xf $VMTOOLS_GCC.tar.xz
+      - name: Build binutils
+        run: |
+          mkdir -p build/$VMTOOLS_BINUTILS && cd build/$VMTOOLS_BINUTILS
+          ../../$VMTOOLS_BINUTILS/configure \
+              --prefix=$VMTOOLS_PREFIX/host.$(gcc -dumpmachine) \
+              --target=$VMTOOLS_TARGET \
+              --with-sysroot \
+              --disable-nls \
+              --disable-plugins \
+              LDFLAGS=--static
+          make -j4
+          make install-strip DESTDIR=$(pwd)/../dist
+          make install-strip
+      - name: Build gcc
+        run: |
+          export PATH="$VMTOOLS_PREFIX/host.$(gcc -dumpmachine)/bin:$PATH"
+          mkdir -p build/$VMTOOLS_GCC && cd build/$VMTOOLS_GCC
+          ../../$VMTOOLS_GCC/configure \
+              --prefix=$VMTOOLS_PREFIX/host.$(gcc -dumpmachine) \
+              --target=$VMTOOLS_TARGET \
+              --enable-languages=c,c++ \
+              --without-headers \
+              --disable-lto \
+              --disable-nls \
+              --disable-plugins \
+              LDFLAGS=--static
+          make -j4 all-gcc
+          make -j4 all-target-libgcc
+          make install-strip-gcc DESTDIR=$(pwd)/../dist
+          make install-strip-target-libgcc DESTDIR=$(pwd)/../dist
+      - name: Package vmtools
+        run: |
+          cd build/dist
+          tar cfJ vmtools+$(gcc -dumpmachine)+$VMTOOLS_TARGET+${VMTOOLS_GCC#gcc-}.tar.xz opt
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: vmtools
+          path: |
+            build/dist/vmtools*.tar.xz
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/r')
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+      - name: Package vmtools
+        run: |
+          for f in vmtools/vmtools*.tar.xz; do tar xf $f; done
+          tar cfJ vmtools-${VMTOOLS_GCC#gcc-}-${{ github.ref_name }}.tar.xz opt
+      - name: Release ${{ github.ref_name }}
+        uses: softprops/action-gh-release@v1
+        with:
+          files: "vmtools-*-${{ github.ref_name }}.tar.xz"
