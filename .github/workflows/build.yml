@@ -4,6 +4,7 @@ env:
   VMTOOLS_PREFIX: /opt/VirtualMetal/vmtools
   VMTOOLS_BINUTILS: binutils-2.39
   VMTOOLS_GCC: gcc-12.2.0
+  VMTOOLS_GDB: gdb-12.1
 
 on:
   push:
@@ -41,6 +42,7 @@ jobs:
           install: >-
             base-devel
             mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-expat
       - name: Install prerequisites (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -48,14 +50,19 @@ jobs:
           sudo apt install libmpc-dev
           sudo apt install libmpfr-dev
           sudo apt install libisl-dev
+          sudo apt install libexpat-dev
       - name: Download binutils source
         run: |
           wget -q https://ftp.gnu.org/gnu/binutils/$VMTOOLS_BINUTILS.tar.xz
           tar xf $VMTOOLS_BINUTILS.tar.xz
       - name: Download gcc source
         run: |
-          wget -q https://ftp.gnu.org/gnu/gcc/gcc-12.2.0/$VMTOOLS_GCC.tar.xz
+          wget -q https://ftp.gnu.org/gnu/gcc/$VMTOOLS_GCC/$VMTOOLS_GCC.tar.xz
           tar xf $VMTOOLS_GCC.tar.xz
+      - name: Download gdb source
+        run: |
+          wget -q https://ftp.gnu.org/gnu/gdb/$VMTOOLS_GDB.tar.xz
+          tar xf $VMTOOLS_GDB.tar.xz
       - name: Build binutils
         run: |
           mkdir -p build/$VMTOOLS_BINUTILS && cd build/$VMTOOLS_BINUTILS
@@ -63,8 +70,9 @@ jobs:
               --prefix=$VMTOOLS_PREFIX/host.$(gcc -dumpmachine) \
               --target=$VMTOOLS_TARGET \
               --with-sysroot \
-              --disable-nls \
               --disable-plugins \
+              --disable-lto \
+              --disable-nls \
               LDFLAGS=--static
           make -j4
           make install-strip DESTDIR=$(pwd)/../dist
@@ -76,16 +84,33 @@ jobs:
           ../../$VMTOOLS_GCC/configure \
               --prefix=$VMTOOLS_PREFIX/host.$(gcc -dumpmachine) \
               --target=$VMTOOLS_TARGET \
-              --enable-languages=c,c++ \
+              --enable-languages=c \
               --without-headers \
+              --disable-plugins \
               --disable-lto \
               --disable-nls \
-              --disable-plugins \
               LDFLAGS=--static
           make -j4 all-gcc
           make -j4 all-target-libgcc
           make install-strip-gcc DESTDIR=$(pwd)/../dist
           make install-strip-target-libgcc DESTDIR=$(pwd)/../dist
+      - name: Build gdb
+        run: |
+          export PATH="$VMTOOLS_PREFIX/host.$(gcc -dumpmachine)/bin:$PATH"
+          mkdir -p build/$VMTOOLS_GDB && cd build/$VMTOOLS_GDB
+          ../../$VMTOOLS_GDB/configure \
+              --prefix=$VMTOOLS_PREFIX/host.$(gcc -dumpmachine) \
+              --target=$VMTOOLS_TARGET \
+              --with-expat \
+              --without-python \
+              --without-guile \
+              --disable-sim \
+              --disable-plugins \
+              --disable-lto \
+              --disable-nls \
+              LDFLAGS=--static
+          make -j4 all-gdb
+          make install-strip-gdb DESTDIR=$(pwd)/../dist
       - name: Package vmtools
         run: |
           cd build/dist
