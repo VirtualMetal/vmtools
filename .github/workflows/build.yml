@@ -27,8 +27,6 @@ jobs:
     defaults:
       run:
         shell: ${{ matrix.shell }}
-    env:
-      VMTOOLS_TARGET: ${{ matrix.target }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -63,11 +61,22 @@ jobs:
         run: |
           wget -q https://ftp.gnu.org/gnu/gdb/$VMTOOLS_GDB.tar.xz
           tar xf $VMTOOLS_GDB.tar.xz
+      - name: Prepare environment
+        run: |
+          VMTOOLS_HOST=$($VMTOOLS_BINUTILS/config.guess | cut -d- -f1,3-)
+          VMTOOLS_TARGET=${{ matrix.target }}
+          VMTOOLS_RELEASE="r$(date +%y%j)"
+          echo VMTOOLS_HOST=$VMTOOLS_HOST
+          echo VMTOOLS_TARGET=$VMTOOLS_TARGET
+          echo VMTOOLS_RELEASE=$VMTOOLS_RELEASE
+          echo VMTOOLS_HOST=$VMTOOLS_HOST >>$GITHUB_ENV
+          echo VMTOOLS_TARGET=$VMTOOLS_TARGET >>$GITHUB_ENV
+          echo VMTOOLS_RELEASE=$VMTOOLS_RELEASE >>$GITHUB_ENV
       - name: Build binutils
         run: |
           mkdir -p build/$VMTOOLS_BINUTILS && cd build/$VMTOOLS_BINUTILS
           ../../$VMTOOLS_BINUTILS/configure \
-              --prefix=$VMTOOLS_PREFIX/host.$(gcc -dumpmachine) \
+              --prefix=$VMTOOLS_PREFIX/host.$VMTOOLS_HOST \
               --target=$VMTOOLS_TARGET \
               --with-sysroot \
               --disable-plugins \
@@ -79,10 +88,10 @@ jobs:
           make install-strip
       - name: Build gcc
         run: |
-          export PATH="$VMTOOLS_PREFIX/host.$(gcc -dumpmachine)/bin:$PATH"
+          export PATH="$VMTOOLS_PREFIX/host.$VMTOOLS_HOST/bin:$PATH"
           mkdir -p build/$VMTOOLS_GCC && cd build/$VMTOOLS_GCC
           ../../$VMTOOLS_GCC/configure \
-              --prefix=$VMTOOLS_PREFIX/host.$(gcc -dumpmachine) \
+              --prefix=$VMTOOLS_PREFIX/host.$VMTOOLS_HOST \
               --target=$VMTOOLS_TARGET \
               --enable-languages=c \
               --without-headers \
@@ -96,10 +105,10 @@ jobs:
           make install-strip-target-libgcc DESTDIR=$(pwd)/../dist
       - name: Build gdb
         run: |
-          export PATH="$VMTOOLS_PREFIX/host.$(gcc -dumpmachine)/bin:$PATH"
+          export PATH="$VMTOOLS_PREFIX/host.$VMTOOLS_HOST/bin:$PATH"
           mkdir -p build/$VMTOOLS_GDB && cd build/$VMTOOLS_GDB
           ../../$VMTOOLS_GDB/configure \
-              --prefix=$VMTOOLS_PREFIX/host.$(gcc -dumpmachine) \
+              --prefix=$VMTOOLS_PREFIX/host.$VMTOOLS_HOST \
               --target=$VMTOOLS_TARGET \
               --with-expat \
               --without-python \
@@ -114,7 +123,8 @@ jobs:
       - name: Package vmtools
         run: |
           cd build/dist
-          tar cfJ vmtools+$(gcc -dumpmachine)+$VMTOOLS_TARGET+${VMTOOLS_GCC#gcc-}.tar.xz opt
+          rm -rf build/dist/$VMTOOLS_PREFIX/host.$VMTOOLS_HOST/share/{info,man}
+          tar cfJ vmtools-$VMTOOLS_GCC-$VMTOOLS_RELEASE+$VMTOOLS_HOST+$VMTOOLS_TARGET.tar.xz opt
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
@@ -125,15 +135,22 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/r')
+    if: startsWith(github.ref, 'refs/tags/')
     steps:
+      - name: Prepare environment
+        run: |
+          VMTOOLS_RELEASE="$(date +%y%j)"
+          echo VMTOOLS_RELEASE=r$VMTOOLS_RELEASE
+          echo VMTOOLS_RELEASE=$VMTOOLS_RELEASE >>$GITHUB_ENV
       - name: Download artifacts
         uses: actions/download-artifact@v3
+        with:
+          name: vmtools
       - name: Package vmtools
         run: |
-          for f in vmtools/vmtools*.tar.xz; do tar xf $f; done
-          tar cfJ vmtools-${VMTOOLS_GCC#gcc-}-${{ github.ref_name }}.tar.xz opt
+          for f in vmtools*.tar.xz; do tar xf $f; done
+          tar cfJ vmtools-$VMTOOLS_GCC-$VMTOOLS_RELEASE.tar.xz opt
       - name: Release ${{ github.ref_name }}
         uses: softprops/action-gh-release@v1
         with:
-          files: "vmtools-*-${{ github.ref_name }}.tar.xz"
+          files: vmtools*.tar.xz
