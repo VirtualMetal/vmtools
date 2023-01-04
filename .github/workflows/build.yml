@@ -151,7 +151,7 @@ jobs:
       - name: Prepare environment
         run: |
           VMTOOLS_RELEASE=${{ github.ref_name }}
-          echo VMTOOLS_RELEASE=r$VMTOOLS_RELEASE
+          echo VMTOOLS_RELEASE=$VMTOOLS_RELEASE
           echo VMTOOLS_RELEASE=$VMTOOLS_RELEASE >>$GITHUB_ENV
       - name: Download artifacts
         uses: actions/download-artifact@v3
