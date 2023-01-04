@@ -8,8 +8,13 @@ env:
 
 on:
   push:
-    tags:
+    branches:
+      # build on all branches except master
       - '*'
+      - '!master'
+    tags:
+      # build on release tags only
+      - 'r[0-9]+'
   workflow_dispatch:
 
 jobs:
@@ -67,7 +72,11 @@ jobs:
         run: |
           VMTOOLS_HOST=$($VMTOOLS_BINUTILS/config.guess | cut -d- -f1,3-)
           VMTOOLS_TARGET=${{ matrix.target }}
-          VMTOOLS_RELEASE="r$(date +%y%j)"
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VMTOOLS_RELEASE=${{ github.ref_name }}
+          else
+            VMTOOLS_RELEASE="pre$(date +%y%j)"
+          fi
           echo VMTOOLS_HOST=$VMTOOLS_HOST
           echo VMTOOLS_TARGET=$VMTOOLS_TARGET
           echo VMTOOLS_RELEASE=$VMTOOLS_RELEASE
@@ -125,7 +134,7 @@ jobs:
       - name: Package vmtools
         run: |
           cd build/dist
-          rm -rf build/dist/$VMTOOLS_PREFIX/host.$VMTOOLS_HOST/share/{info,man}
+          rm -rf $VMTOOLS_PREFIX/host.$VMTOOLS_HOST/share/{info,man}
           tar cfJ vmtools-$VMTOOLS_GCC-$VMTOOLS_RELEASE+$VMTOOLS_HOST+$VMTOOLS_TARGET.tar.xz opt
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
@@ -141,7 +150,7 @@ jobs:
     steps:
       - name: Prepare environment
         run: |
-          VMTOOLS_RELEASE="$(date +%y%j)"
+          VMTOOLS_RELEASE=${{ github.ref_name }}
           echo VMTOOLS_RELEASE=r$VMTOOLS_RELEASE
           echo VMTOOLS_RELEASE=$VMTOOLS_RELEASE >>$GITHUB_ENV
       - name: Download artifacts
@@ -155,4 +164,10 @@ jobs:
       - name: Release ${{ github.ref_name }}
         uses: softprops/action-gh-release@v1
         with:
+          name: Release ${{ github.ref_name }}
+          body: |
+            Included tools:
+            - ${{ env.VMTOOLS_GCC }}
+            - ${{ env.VMTOOLS_GDB }}
+            - ${{ env.VMTOOLS_BINUTILS }}
           files: vmtools*.tar.xz
