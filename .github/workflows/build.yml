@@ -75,7 +75,7 @@ jobs:
           if [[ "${{ github.ref }}" == refs/tags/* ]]; then
             VMTOOLS_RELEASE=${{ github.ref_name }}
           else
-            VMTOOLS_RELEASE="pre$(date +%y%j)"
+            VMTOOLS_RELEASE="dev$(date +%y%j)"
           fi
           echo VMTOOLS_HOST=$VMTOOLS_HOST
           echo VMTOOLS_TARGET=$VMTOOLS_TARGET
