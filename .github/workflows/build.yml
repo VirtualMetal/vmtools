@@ -135,7 +135,7 @@ jobs:
         run: |
           cd build/dist
           rm -rf $VMTOOLS_PREFIX/host.$VMTOOLS_HOST/share/{info,man}
-          tar cfJ vmtools-$VMTOOLS_GCC-$VMTOOLS_RELEASE+$VMTOOLS_HOST+$VMTOOLS_TARGET.tar.xz opt
+          tar cf - opt | xz -9 >vmtools-$VMTOOLS_GCC-$VMTOOLS_RELEASE+$VMTOOLS_HOST+$VMTOOLS_TARGET.tar.xz
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
@@ -160,7 +160,7 @@ jobs:
       - name: Package vmtools
         run: |
           for f in vmtools*.tar.xz; do tar xf $f; done
-          tar cfJ vmtools-$VMTOOLS_GCC-$VMTOOLS_RELEASE.tar.xz opt
+          tar cf - opt | xz -9 >vmtools-$VMTOOLS_GCC-$VMTOOLS_RELEASE.tar.xz
       - name: Release ${{ github.ref_name }}
         uses: softprops/action-gh-release@v1
         with:
