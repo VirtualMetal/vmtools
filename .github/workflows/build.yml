@@ -97,6 +97,8 @@ jobs:
               --disable-plugins \
               --disable-lto \
               --disable-nls \
+              CFLAGS="-ffile-prefix-map=${{ github.workspace }}=." \
+              CXXFLAGS="-ffile-prefix-map=${{ github.workspace }}=." \
               LDFLAGS=--static
           make -j4
           make install-strip DESTDIR=$(pwd)/../dist
@@ -113,6 +115,8 @@ jobs:
               --disable-plugins \
               --disable-lto \
               --disable-nls \
+              CFLAGS="-ffile-prefix-map=${{ github.workspace }}=." \
+              CXXFLAGS="-ffile-prefix-map=${{ github.workspace }}=." \
               LDFLAGS=--static
           make -j4 all-gcc
           make -j4 all-target-libgcc
@@ -132,6 +136,8 @@ jobs:
               --disable-plugins \
               --disable-lto \
               --disable-nls \
+              CFLAGS="-ffile-prefix-map=${{ github.workspace }}=." \
+              CXXFLAGS="-ffile-prefix-map=${{ github.workspace }}=." \
               LDFLAGS=--static
           make -j4 all-gdb
           make install-strip-gdb DESTDIR=$(pwd)/../dist
