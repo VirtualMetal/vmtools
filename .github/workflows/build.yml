@@ -100,7 +100,7 @@ jobs:
               --disable-lto \
               --disable-nls
           make -j4
-          make install-strip DESTDIR=$(pwd)/../dist
+          make install-strip DESTDIR=$(pwd)/../dist/$VMTOOLS_GCC
           make install-strip
       - name: Build gcc
         run: |
@@ -119,11 +119,10 @@ jobs:
               --disable-nls
           make -j4 all-gcc
           make -j4 all-target-libgcc
-          make install-strip-gcc DESTDIR=$(pwd)/../dist
-          make install-strip-target-libgcc DESTDIR=$(pwd)/../dist
+          make install-strip-gcc DESTDIR=$(pwd)/../dist/$VMTOOLS_GCC
+          make install-strip-target-libgcc DESTDIR=$(pwd)/../dist/$VMTOOLS_GCC
       - name: Build gdb
         run: |
-          export PATH="$VMTOOLS_PREFIX/host.$VMTOOLS_HOST/bin:$PATH"
           mkdir -p build/$VMTOOLS_GDB && cd build/$VMTOOLS_GDB
           CFLAGS="-ffile-prefix-map=${{ github.workspace }}=." \
           CXXFLAGS="-ffile-prefix-map=${{ github.workspace }}=." \
@@ -139,13 +138,16 @@ jobs:
               --disable-lto \
               --disable-nls
           make -j4 all-gdb
-          make install-strip-gdb DESTDIR=$(pwd)/../dist
+          make install-strip-gdb DESTDIR=$(pwd)/../dist/$VMTOOLS_GDB
       - name: Package vmtools
         run: |
           cd build/dist
-          rm -rf $VMTOOLS_PREFIX/host.$VMTOOLS_HOST/share/{info,man}
-          tar --mtime=@$SOURCE_DATE_EPOCH --owner=0 --group=0 --numeric-owner --sort=name -cf - opt | \
+          rm -rf $VMTOOLS_GCC/$VMTOOLS_PREFIX/host.$VMTOOLS_HOST/share/{info,man}
+          tar --mtime=@$SOURCE_DATE_EPOCH --owner=0 --group=0 --numeric-owner --sort=name -cf - -C $VMTOOLS_GCC opt | \
               xz -9 >vmtools-$VMTOOLS_GCC-$VMTOOLS_RELEASE+$VMTOOLS_HOST+$VMTOOLS_TARGET.tar.xz
+          rm -rf $VMTOOLS_GDB/$VMTOOLS_PREFIX/host.$VMTOOLS_HOST/share/{info,man}
+          tar --mtime=@$SOURCE_DATE_EPOCH --owner=0 --group=0 --numeric-owner --sort=name -cf - -C $VMTOOLS_GDB opt | \
+              xz -9 >vmtools-$VMTOOLS_GDB-$VMTOOLS_RELEASE+$VMTOOLS_HOST+$VMTOOLS_TARGET.tar.xz
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
@@ -171,16 +173,20 @@ jobs:
           name: vmtools
       - name: Package vmtools
         run: |
-          for f in vmtools*.tar.xz; do tar xf $f; done
-          tar --mtime=@$SOURCE_DATE_EPOCH --owner=0 --group=0 --numeric-owner --sort=name -cf - opt | \
+          mkdir $VMTOOLS_GCC
+          for f in vmtools-$VMTOOLS_GCC-*.tar.xz; do tar xf $f -C $VMTOOLS_GCC; done
+          tar --mtime=@$SOURCE_DATE_EPOCH --owner=0 --group=0 --numeric-owner --sort=name -cf - -C $VMTOOLS_GCC opt | \
               xz -9 >vmtools-$VMTOOLS_GCC-$VMTOOLS_RELEASE.tar.xz
+          mkdir $VMTOOLS_GDB
+          for f in vmtools-$VMTOOLS_GDB-*.tar.xz; do tar xf $f -C $VMTOOLS_GDB; done
+          tar --mtime=@$SOURCE_DATE_EPOCH --owner=0 --group=0 --numeric-owner --sort=name -cf - -C $VMTOOLS_GDB opt | \
+              xz -9 >vmtools-$VMTOOLS_GDB-$VMTOOLS_RELEASE.tar.xz
       - name: Release ${{ github.ref_name }}
         uses: softprops/action-gh-release@v1
         with:
           name: Release ${{ github.ref_name }}
           body: |
             Included tools:
-            - ${{ env.VMTOOLS_GCC }}
+            - ${{ env.VMTOOLS_GCC }} (with ${{ env.VMTOOLS_BINUTILS }})
             - ${{ env.VMTOOLS_GDB }}
-            - ${{ env.VMTOOLS_BINUTILS }}
           files: vmtools*.tar.xz
