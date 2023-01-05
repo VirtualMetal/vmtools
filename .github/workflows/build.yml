@@ -46,6 +46,7 @@ jobs:
           msystem: mingw64
           install: >-
             base-devel
+            git
             mingw-w64-x86_64-gcc
             mingw-w64-x86_64-expat
       - name: Install prerequisites (Linux)
@@ -83,6 +84,8 @@ jobs:
           echo VMTOOLS_HOST=$VMTOOLS_HOST >>$GITHUB_ENV
           echo VMTOOLS_TARGET=$VMTOOLS_TARGET >>$GITHUB_ENV
           echo VMTOOLS_RELEASE=$VMTOOLS_RELEASE >>$GITHUB_ENV
+          # see https://reproducible-builds.org/specs/source-date-epoch/
+          echo SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct) >>$GITHUB_ENV
       - name: Build binutils
         run: |
           mkdir -p build/$VMTOOLS_BINUTILS && cd build/$VMTOOLS_BINUTILS
@@ -90,6 +93,7 @@ jobs:
               --prefix=$VMTOOLS_PREFIX/host.$VMTOOLS_HOST \
               --target=$VMTOOLS_TARGET \
               --with-sysroot \
+              --enable-deterministic-archives \
               --disable-plugins \
               --disable-lto \
               --disable-nls \
@@ -104,8 +108,8 @@ jobs:
           ../../$VMTOOLS_GCC/configure \
               --prefix=$VMTOOLS_PREFIX/host.$VMTOOLS_HOST \
               --target=$VMTOOLS_TARGET \
-              --enable-languages=c \
               --without-headers \
+              --enable-languages=c \
               --disable-plugins \
               --disable-lto \
               --disable-nls \
@@ -135,7 +139,8 @@ jobs:
         run: |
           cd build/dist
           rm -rf $VMTOOLS_PREFIX/host.$VMTOOLS_HOST/share/{info,man}
-          tar cf - opt | xz -9 >vmtools-$VMTOOLS_GCC-$VMTOOLS_RELEASE+$VMTOOLS_HOST+$VMTOOLS_TARGET.tar.xz
+          tar --mtime=@$SOURCE_DATE_EPOCH --owner=0 --group=0 --numeric-owner --sort=name -cf - opt | \
+              xz -9 >vmtools-$VMTOOLS_GCC-$VMTOOLS_RELEASE+$VMTOOLS_HOST+$VMTOOLS_TARGET.tar.xz
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
@@ -153,6 +158,8 @@ jobs:
           VMTOOLS_RELEASE=${{ github.ref_name }}
           echo VMTOOLS_RELEASE=$VMTOOLS_RELEASE
           echo VMTOOLS_RELEASE=$VMTOOLS_RELEASE >>$GITHUB_ENV
+          # see https://reproducible-builds.org/specs/source-date-epoch/
+          echo SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct) >>$GITHUB_ENV
       - name: Download artifacts
         uses: actions/download-artifact@v3
         with:
@@ -160,7 +167,8 @@ jobs:
       - name: Package vmtools
         run: |
           for f in vmtools*.tar.xz; do tar xf $f; done
-          tar cf - opt | xz -9 >vmtools-$VMTOOLS_GCC-$VMTOOLS_RELEASE.tar.xz
+          tar --mtime=@$SOURCE_DATE_EPOCH --owner=0 --group=0 --numeric-owner --sort=name -cf - opt | \
+              xz -9 >vmtools-$VMTOOLS_GCC-$VMTOOLS_RELEASE.tar.xz
       - name: Release ${{ github.ref_name }}
         uses: softprops/action-gh-release@v1
         with:
