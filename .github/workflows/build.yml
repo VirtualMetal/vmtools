@@ -89,17 +89,16 @@ jobs:
       - name: Build binutils
         run: |
           mkdir -p build/$VMTOOLS_BINUTILS && cd build/$VMTOOLS_BINUTILS
+          CFLAGS="-ffile-prefix-map=${{ github.workspace }}=." \
+          CXXFLAGS="-ffile-prefix-map=${{ github.workspace }}=." \
+          LDFLAGS=--static \
           ../../$VMTOOLS_BINUTILS/configure \
               --prefix=$VMTOOLS_PREFIX/host.$VMTOOLS_HOST \
               --target=$VMTOOLS_TARGET \
-              --with-sysroot \
               --enable-deterministic-archives \
               --disable-plugins \
               --disable-lto \
-              --disable-nls \
-              CFLAGS="-ffile-prefix-map=${{ github.workspace }}=." \
-              CXXFLAGS="-ffile-prefix-map=${{ github.workspace }}=." \
-              LDFLAGS=--static
+              --disable-nls
           make -j4
           make install-strip DESTDIR=$(pwd)/../dist
           make install-strip
@@ -107,6 +106,9 @@ jobs:
         run: |
           export PATH="$VMTOOLS_PREFIX/host.$VMTOOLS_HOST/bin:$PATH"
           mkdir -p build/$VMTOOLS_GCC && cd build/$VMTOOLS_GCC
+          CFLAGS="-ffile-prefix-map=${{ github.workspace }}=." \
+          CXXFLAGS="-ffile-prefix-map=${{ github.workspace }}=." \
+          LDFLAGS=--static \
           ../../$VMTOOLS_GCC/configure \
               --prefix=$VMTOOLS_PREFIX/host.$VMTOOLS_HOST \
               --target=$VMTOOLS_TARGET \
@@ -114,10 +116,7 @@ jobs:
               --enable-languages=c \
               --disable-plugins \
               --disable-lto \
-              --disable-nls \
-              CFLAGS="-ffile-prefix-map=${{ github.workspace }}=." \
-              CXXFLAGS="-ffile-prefix-map=${{ github.workspace }}=." \
-              LDFLAGS=--static
+              --disable-nls
           make -j4 all-gcc
           make -j4 all-target-libgcc
           make install-strip-gcc DESTDIR=$(pwd)/../dist
@@ -126,6 +125,9 @@ jobs:
         run: |
           export PATH="$VMTOOLS_PREFIX/host.$VMTOOLS_HOST/bin:$PATH"
           mkdir -p build/$VMTOOLS_GDB && cd build/$VMTOOLS_GDB
+          CFLAGS="-ffile-prefix-map=${{ github.workspace }}=." \
+          CXXFLAGS="-ffile-prefix-map=${{ github.workspace }}=." \
+          LDFLAGS=--static \
           ../../$VMTOOLS_GDB/configure \
               --prefix=$VMTOOLS_PREFIX/host.$VMTOOLS_HOST \
               --target=$VMTOOLS_TARGET \
@@ -135,10 +137,7 @@ jobs:
               --disable-sim \
               --disable-plugins \
               --disable-lto \
-              --disable-nls \
-              CFLAGS="-ffile-prefix-map=${{ github.workspace }}=." \
-              CXXFLAGS="-ffile-prefix-map=${{ github.workspace }}=." \
-              LDFLAGS=--static
+              --disable-nls
           make -j4 all-gdb
           make install-strip-gdb DESTDIR=$(pwd)/../dist
       - name: Package vmtools
