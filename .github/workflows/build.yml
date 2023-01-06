@@ -198,6 +198,6 @@ jobs:
           name: vmtools ${{ steps.environment.outputs.release_name }}
           body: |
             Included tools:
-            - ${{ env.VMTOOLS_GCC }} (with ${{ env.VMTOOLS_BINUTILS }})
-            - ${{ env.VMTOOLS_GDB }}
+            - [${{ env.VMTOOLS_GCC }}](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ github.ref }}/vmtools-${{ env.VMTOOLS_GCC }}-${{ env.VMTOOLS_RELEASE }}.tar.xz) (with ${{ env.VMTOOLS_BINUTILS }})
+            - [${{ env.VMTOOLS_GDB }}](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ github.ref }}/vmtools-${{ env.VMTOOLS_GDB }}-${{ env.VMTOOLS_RELEASE }}.tar.xz)
           files: vmtools*.tar.xz
