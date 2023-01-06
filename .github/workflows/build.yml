@@ -195,7 +195,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
-          name: VirtualMetal development tools ${{ steps.environment.outputs.release_name }}
+          name: vmtools ${{ steps.environment.outputs.release_name }}
           body: |
             Included tools:
             - ${{ env.VMTOOLS_GCC }} (with ${{ env.VMTOOLS_BINUTILS }})
