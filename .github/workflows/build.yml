@@ -24,12 +24,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest]
+        os: [windows-2022, ubuntu-22.04]
         target: [x86_64-elf, aarch64-elf]
         include:
-          - os: windows-latest
+          - os: windows-2022
             shell: msys2 {0}
-          - os: ubuntu-latest
+          - os: ubuntu-22.04
             shell: bash
     runs-on: ${{ matrix.os }}
     outputs:
@@ -161,7 +161,7 @@ jobs:
 
   release:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     env:
       SOURCE_DATE_EPOCH: ${{ needs.build.outputs.SOURCE_DATE_EPOCH }}
       VMTOOLS_RELEASE: ${{ needs.build.outputs.VMTOOLS_RELEASE }}
