@@ -14,7 +14,8 @@ on:
       - '!master'
     tags:
       # build on release tags only
-      - 'r[0-9]+'
+      - 'r[0-9]+*'
+      - 'v[0-9]+*'
   workflow_dispatch:
 
 jobs:
@@ -31,14 +32,15 @@ jobs:
           - os: ubuntu-latest
             shell: bash
     runs-on: ${{ matrix.os }}
+    outputs:
+      SOURCE_DATE_EPOCH: ${{ steps.environment.outputs.SOURCE_DATE_EPOCH }}
+      VMTOOLS_RELEASE: ${{ steps.environment.outputs.VMTOOLS_RELEASE }}
     defaults:
       run:
         shell: ${{ matrix.shell }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-        with:
-          submodules: recursive
       - name: Install prerequisites (Windows)
         if: runner.os == 'Windows'
         uses: msys2/setup-msys2@v2
@@ -70,22 +72,24 @@ jobs:
           wget -q https://ftp.gnu.org/gnu/gdb/$VMTOOLS_GDB.tar.xz
           tar xf $VMTOOLS_GDB.tar.xz
       - name: Prepare environment
+        id: environment
         run: |
+          # see https://reproducible-builds.org/specs/source-date-epoch/
+          SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct)
+          echo SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH >>$GITHUB_ENV
+          echo SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH >>$GITHUB_OUTPUT
+          # VMTOOLS_RELEASE
+          VMTOOLS_RELEASE="r$(date --date=@$SOURCE_DATE_EPOCH +%y%m%d)"
+          echo VMTOOLS_RELEASE=$VMTOOLS_RELEASE
+          echo VMTOOLS_RELEASE=$VMTOOLS_RELEASE >>$GITHUB_ENV
+          echo VMTOOLS_RELEASE=$VMTOOLS_RELEASE >>$GITHUB_OUTPUT
+          # additional VMTOOLS variables
           VMTOOLS_HOST=$($VMTOOLS_BINUTILS/config.guess | cut -d- -f1,3-)
           VMTOOLS_TARGET=${{ matrix.target }}
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            VMTOOLS_RELEASE=${{ github.ref_name }}
-          else
-            VMTOOLS_RELEASE="dev$(date +%y%j)"
-          fi
           echo VMTOOLS_HOST=$VMTOOLS_HOST
           echo VMTOOLS_TARGET=$VMTOOLS_TARGET
-          echo VMTOOLS_RELEASE=$VMTOOLS_RELEASE
           echo VMTOOLS_HOST=$VMTOOLS_HOST >>$GITHUB_ENV
           echo VMTOOLS_TARGET=$VMTOOLS_TARGET >>$GITHUB_ENV
-          echo VMTOOLS_RELEASE=$VMTOOLS_RELEASE >>$GITHUB_ENV
-          # see https://reproducible-builds.org/specs/source-date-epoch/
-          echo SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct) >>$GITHUB_ENV
       - name: Build binutils
         run: |
           mkdir -p build/$VMTOOLS_BINUTILS && cd build/$VMTOOLS_BINUTILS
@@ -158,15 +162,14 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    env:
+      SOURCE_DATE_EPOCH: ${{ needs.build.outputs.SOURCE_DATE_EPOCH }}
+      VMTOOLS_RELEASE: ${{ needs.build.outputs.VMTOOLS_RELEASE }}
     steps:
       - name: Prepare environment
+        id: environment
         run: |
-          VMTOOLS_RELEASE=${{ github.ref_name }}
-          echo VMTOOLS_RELEASE=$VMTOOLS_RELEASE
-          echo VMTOOLS_RELEASE=$VMTOOLS_RELEASE >>$GITHUB_ENV
-          # see https://reproducible-builds.org/specs/source-date-epoch/
-          echo SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct) >>$GITHUB_ENV
+          echo release_name=$(date --date=@$SOURCE_DATE_EPOCH +%Y-%m-%d) >>$GITHUB_OUTPUT
       - name: Download artifacts
         uses: actions/download-artifact@v3
         with:
@@ -181,10 +184,18 @@ jobs:
           for f in vmtools-$VMTOOLS_GDB-*.tar.xz; do tar xf $f -C $VMTOOLS_GDB; done
           tar --mtime=@$SOURCE_DATE_EPOCH --owner=0 --group=0 --numeric-owner --sort=name -cf - -C $VMTOOLS_GDB opt | \
               xz -9 >vmtools-$VMTOOLS_GDB-$VMTOOLS_RELEASE.tar.xz
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: vmtools
+          path: |
+            vmtools-${{ env.VMTOOLS_GCC }}-${{ env.VMTOOLS_RELEASE }}.tar.xz
+            vmtools-${{ env.VMTOOLS_GDB }}-${{ env.VMTOOLS_RELEASE }}.tar.xz
       - name: Release ${{ github.ref_name }}
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
-          name: Release ${{ github.ref_name }}
+          name: ${{ steps.environment.outputs.release_name }}
           body: |
             Included tools:
             - ${{ env.VMTOOLS_GCC }} (with ${{ env.VMTOOLS_BINUTILS }})
