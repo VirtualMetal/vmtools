@@ -104,8 +104,8 @@ jobs:
               --disable-lto \
               --disable-nls
           make -j4
-          make install-strip DESTDIR=$(pwd)/../dist/$VMTOOLS_GCC
-          make install-strip
+          make install DESTDIR=$(pwd)/../dist/$VMTOOLS_GCC
+          make install
       - name: Build gcc
         run: |
           export PATH="$VMTOOLS_PREFIX/host.$VMTOOLS_HOST/bin:$PATH"
@@ -123,8 +123,8 @@ jobs:
               --disable-nls
           make -j4 all-gcc
           make -j4 all-target-libgcc
-          make install-strip-gcc DESTDIR=$(pwd)/../dist/$VMTOOLS_GCC
-          make install-strip-target-libgcc DESTDIR=$(pwd)/../dist/$VMTOOLS_GCC
+          make install-gcc DESTDIR=$(pwd)/../dist/$VMTOOLS_GCC
+          make install-target-libgcc DESTDIR=$(pwd)/../dist/$VMTOOLS_GCC
       - name: Build gdb
         run: |
           mkdir -p build/$VMTOOLS_GDB && cd build/$VMTOOLS_GDB
@@ -142,7 +142,7 @@ jobs:
               --disable-lto \
               --disable-nls
           make -j4 all-gdb
-          make install-strip-gdb DESTDIR=$(pwd)/../dist/$VMTOOLS_GDB
+          make install-gdb DESTDIR=$(pwd)/../dist/$VMTOOLS_GDB
       - name: Package vmtools
         run: |
           cd build/dist
